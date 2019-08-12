@@ -46,7 +46,7 @@ if (!string.IsNullOrWhiteSpace(userWords))
 }			
 ```
 
-## Slide 23
+## Slide 31
 ```
 if (turnContext.Activity.ChannelId.ToLower() == "line")
 {
@@ -150,5 +150,19 @@ private async Task<Dictionary<string, string>> GetLUISPrediction(string text)
 		{ {"Intent", intent},
 		  {"Entity", entity}};
 	}
+}
+```
+
+```
+var luisPredction = await GetLUISPrediction(userWords);
+if (luisPredction["Intent"] != "None")
+{
+	predictionResult = "OK，你想要" + luisPredction["Intent"] + "，" + luisPredction["Entity"];
+	reply.Text = predictionResult;
+}
+else
+{
+	// Get the answer from the QnA maker
+	// Todo
 }
 ```
