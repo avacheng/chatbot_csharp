@@ -63,30 +63,38 @@ private async Task<Dictionary<string, string>> GetLUISPrediction(string text)
 	using (var client = new HttpClient())
 	using (var request = new HttpRequestMessage())
 	{
-		request.Method = HttpMethod.Get;
-		string uri = _config.GetValue<string>("LuisEndpoint") + HttpUtility.UrlEncode(text, myEncoding);
-		request.RequestUri = new Uri(uri);
+		var queryString = HttpUtility.ParseQueryString(string.Empty);
+		// Request headers
+		client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _config.GetValue<string>("LuisKey"));
+		// Request parameters
+		queryString["verbose"] = "true";
+		//queryString["staging"] = "{boolean}";
+		var uri = _config.GetValue<string>("LuisUri") + queryString;
 
-		var response = await client.SendAsync(request);
-		var responseBody = await response.Content.ReadAsStringAsync();
-		var jsonObject = JObject.Parse(responseBody);
-		string intent = jsonObject["intents"][0]["intent"].ToString();
-		string entity = "但是我無法進一步分析" + intent;
-		if (jsonObject.ContainsKey("compositeEntities"))
+		HttpResponseMessage response;
+		byte[] byteData = Encoding.UTF8.GetBytes("\"" + text + "\"");
+		using (var content = new ByteArrayContent(byteData))
 		{
-			entity = jsonObject["compositeEntities"][0]["value"].ToString();
-		}
-		else
-		{
-			if (jsonObject["entities"].Count() > 0)
+			response = await client.PostAsync(uri, content);
+			var result = await response.Content.ReadAsStringAsync();
+			var jsonObject = JObject.Parse(result);
+			string intent = jsonObject["intents"][0]["intent"].ToString();
+			string entity = "但是我無法進一步分析" + intent;
+			if (jsonObject.ContainsKey("compositeEntities"))
 			{
-				entity = jsonObject["entities"][0]["entity"].ToString();
+				entity = jsonObject["compositeEntities"][0]["value"].ToString();
 			}
+			else
+			{
+				if (jsonObject["entities"].Count() > 0)
+				{
+					entity = jsonObject["entities"][0]["entity"].ToString();
+				}
+			}
+			return new Dictionary<string, string>()
+			{ {"Intent", intent},
+			  {"Entity", entity}};
 		}
-
-		return new Dictionary<string, string>()
-		{ {"Intent", intent},
-		  {"Entity", entity}};
 	}
 }
 ```
