@@ -1,5 +1,3 @@
-# chatbot_csharp
-
 ## Slide 26
 ```
 private async Task<string> GetQnAResponse(string question)
@@ -166,5 +164,144 @@ private void CollectRequestData(ITurnContext<IMessageActivity> turnContext, stri
 	SaveData(address);
 }
 ```
+
+## Slide 52
+```
+if (turnContext.Activity.ChannelId.ToLower() == "line")
+{
+	// LINE ButtonsTemplate 有字數限制
+	// LINE Templates 手機上無法顯示
+	string puretext = System.Text.RegularExpressions.Regex.Replace(reply.Text, "<.*?>", string.Empty);
+	if (createButtons && puretext.Length <= 50)
+	{
+		var ButtonsTemplateMsg = new isRock.LineBot.ButtonsTemplate();
+		ButtonsTemplateMsg.text = puretext + "請問有幫助到您嗎?";
+		ButtonsTemplateMsg.title = "查詢回覆";
+		var actions = new List<isRock.LineBot.TemplateActionBase>();
+		actions.Add(new isRock.LineBot.MessageAction() { label = "<<很有用>>", text = "<<很有用>>" });
+		actions.Add(new isRock.LineBot.MessageAction() { label = "<<普通>>", text = "<<普通>>" });
+		actions.Add(new isRock.LineBot.MessageAction() { label = "<<再加強>>", text = "<<再加強>>" });
+		ButtonsTemplateMsg.actions = actions;
+		isRock.LineBot.Utility.ReplyTemplateMessage(reply.ReplyToId, ButtonsTemplateMsg, _config.GetValue<string>("LineAccessToken"));
+	}
+	else
+	{
+		isRock.LineBot.Utility.ReplyMessage(reply.ReplyToId, reply.Text, _config.GetValue<string>("LineAccessToken"));
+	}
+}
+else
+{
+	if (createButtons)
+	{
+		reply = (turnContext.Activity as Activity).CreateReply(reply.Text + "\n\n請問有幫助到您嗎?");
+		reply.SuggestedActions = new SuggestedActions()
+		{
+			Actions = new List<CardAction>()
+			{
+				new CardAction() { Title = "<<很有用>>", Type = ActionTypes.ImBack, Value = "<<很有用>>" },
+				new CardAction() { Title = "<<普通>>", Type = ActionTypes.ImBack, Value = "<<普通>>" },
+				new CardAction() { Title = "<<再加強>>", Type = ActionTypes.ImBack, Value = "<<再加強>>" }
+			},
+		};
+	}
+	await connector.Conversations.ReplyToActivityAsync(reply);
+}
+
+```
+
+## Slide 54
+```
+private string ReadData(string source, string user)
+{
+	string sheetId = "GoogleSheetId";
+	var address = $"https://spreadsheets.google.com/feeds/cells/{sheetId}/1/public/values?alt=json";
+
+	//建立 WebRequest 並指定目標的 uri
+	HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(address);
+	//指定 request 使用的 http verb
+	request.Method = "GET";
+	request.ContentType = "application/json; charset=utf-8";
+
+	var timeString = "";
+	//使用 GetResponse 方法將 request 送出
+	using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+	//使用 GetResponseStream 方法從 server 回應中取得資料，stream 必須被關閉
+	using (StreamReader streamreader = new StreamReader(response.GetResponseStream()))
+	{
+		timeString = streamreader.ReadToEnd();
+	}
+	var list = JObject.Parse(timeString)["feed"]["entry"];
+	timeString = "";
+	for (int i = list.Count() - 1; i >= 0; i--)
+	{
+		if (list[i]["content"]["$t"].ToString() == source && list[i + 3]["content"]["$t"].ToString() == user)
+		{
+			timeString = list[i - 1]["content"]["$t"].ToString();
+			break;
+		}
+	}
+
+	return timeString;
+}
+```
+
+## Slide 55
+```
+private void CollectSurveyData(ITurnContext<IMessageActivity> turnContext, string result)
+{
+	string timeString = ReadData(turnContext.Activity.ChannelId, turnContext.Activity.From.Id);
+
+	if (timeString.Length > 0)
+	{
+		string scriptId = "GoogleScriptId2";
+		string address = $"https://docs.google.com/forms/d/e/{scriptId}/formResponse?";
+		// DateTime
+		address += "entry.1=" + HttpUtility.UrlEncode(timeString, myEncoding);
+		// Source
+		address += "&entry.2=" + HttpUtility.UrlEncode(turnContext.Activity.ChannelId, myEncoding);
+		// UserId
+		address += "&entry.3=" + HttpUtility.UrlEncode(turnContext.Activity.From.Id, myEncoding);
+		// Remark
+		address += "&entry.4=" + HttpUtility.UrlEncode(gradeDictionary.ContainsKey(result) ? gradeDictionary[result] : result, myEncoding);
+		address += "&submit=Submit";
+		SaveData(address);
+	}
+}
+```
+
+## Slide 56
+```
+static readonly Dictionary<string, string> gradeDictionary = new Dictionary<string, string>()
+{{"<<很有用>>", "90" }, {"<<普通>>",  "50" }, {"<<再加強>>",  "10" }};
+```
+
+```
+if (userWords.StartsWith("<<"))
+{
+	reply.Text = "謝謝您！歡迎繼續發問喔！";
+	answerServey = true;
+}
+```
+
+```
+if (answerServey)
+{
+	CollectSurveyData(turnContext, userWords);
+}
+else
+{
+	CollectRequestData(turnContext, predictionResult);
+}
+```
+
+
+
+
+
+
+
+
+
+
 
 
