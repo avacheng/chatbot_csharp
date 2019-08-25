@@ -1,16 +1,22 @@
 ## Slide 26
 ```
+private readonly IConfiguration _config;
+public EchoBot(IConfiguration config)
+{
+	_config = config;
+}
+
 private async Task<string> GetQnAResponse(string question)
 {
 	using (var client = new HttpClient())
 	using (var request = new HttpRequestMessage())
 	{
 		request.Method = HttpMethod.Post;
-		request.RequestUri = new Uri(_config.GetValue<string>("QnAUri"));
+		request.RequestUri = new Uri(_config["QnAUri"]);
 		request.Content = new StringContent("{question:'" + question + "'}", Encoding.UTF8, "application/json");
 
 		// The value of the header contains the string/text 'EndpointKey ' with the trailing space
-		request.Headers.Add("Authorization", "EndpointKey " + _config.GetValue<string>("QnAEndpointKey"));
+		request.Headers.Add("Authorization", "EndpointKey " + _config["QnAEndpointKey"]);
 
 		var response = await client.SendAsync(request);
 		var responseBody = await response.Content.ReadAsStringAsync();
@@ -21,7 +27,7 @@ private async Task<string> GetQnAResponse(string question)
 
 ## Slide 27
 ```
-var connector = new ConnectorClient(new Uri(turnContext.Activity.ServiceUrl), _config.GetValue<string>("MicrosoftAppId"), _config.GetValue<string>("MicrosoftAppPassword"));
+var connector = new ConnectorClient(new Uri(turnContext.Activity.ServiceUrl), _config["MicrosoftAppId"], _config["MicrosoftAppPassword"]);
 var reply = (turnContext.Activity as Activity).CreateReply();
 string userWords = turnContext.Activity.Text;
 string predictionResult;
@@ -32,7 +38,7 @@ if (!string.IsNullOrWhiteSpace(userWords))
 	predictionResult = await GetQnAResponse(userWords);
 	if (predictionResult != "No good match found in KB.")
 	{
-		reply.Text = (turnContext.Activity as Activity).CreateReply(predictionResult);
+		reply = (turnContext.Activity as Activity).CreateReply(predictionResult);
 	}
 
 	if (reply.Text.Length == 0)
@@ -48,7 +54,7 @@ if (!string.IsNullOrWhiteSpace(userWords))
 ```
 if (turnContext.Activity.ChannelId.ToLower() == "line")
 {
-	isRock.LineBot.Utility.ReplyMessage(reply.ReplyToId, reply.Text, _config.GetValue<string>("LineAccessToken"));
+	isRock.LineBot.Utility.ReplyMessage(reply.ReplyToId, reply.Text, _config["LineAccessToken"]);
 }
 else
 {
@@ -65,11 +71,11 @@ private async Task<Dictionary<string, string>> GetLUISPrediction(string text)
 	{
 		var queryString = HttpUtility.ParseQueryString(string.Empty);
 		// Request headers
-		client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _config.GetValue<string>("LuisKey"));
+		client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _config["LuisKey"]);
 		// Request parameters
 		queryString["verbose"] = "true";
 		//queryString["staging"] = "{boolean}";
-		var uri = _config.GetValue<string>("LuisUri") + queryString;
+		var uri = _config["LuisUri"] + queryString;
 
 		HttpResponseMessage response;
 		byte[] byteData = Encoding.UTF8.GetBytes("\"" + text + "\"");
@@ -144,6 +150,8 @@ private void SaveData(string address)
 
 ## Slide 50
 ```
+Encoding myEncoding = Encoding.GetEncoding("UTF-8");
+
 private void CollectRequestData(ITurnContext<IMessageActivity> turnContext, string answer)
 {
 	// Convert UTC Time to Taipei Time
@@ -190,11 +198,11 @@ if (turnContext.Activity.ChannelId.ToLower() == "line")
 		actions.Add(new isRock.LineBot.MessageAction() { label = "<<普通>>", text = "<<普通>>" });
 		actions.Add(new isRock.LineBot.MessageAction() { label = "<<再加強>>", text = "<<再加強>>" });
 		ButtonsTemplateMsg.actions = actions;
-		isRock.LineBot.Utility.ReplyTemplateMessage(reply.ReplyToId, ButtonsTemplateMsg, _config.GetValue<string>("LineAccessToken"));
+		isRock.LineBot.Utility.ReplyTemplateMessage(reply.ReplyToId, ButtonsTemplateMsg, _config["LineAccessToken"]);
 	}
 	else
 	{
-		isRock.LineBot.Utility.ReplyMessage(reply.ReplyToId, reply.Text, _config.GetValue<string>("LineAccessToken"));
+		isRock.LineBot.Utility.ReplyMessage(reply.ReplyToId, reply.Text, _config["LineAccessToken"]);
 	}
 }
 else
@@ -300,6 +308,10 @@ else
 {
 	CollectRequestData(turnContext, predictionResult);
 }
+```
+
+```
+=IFERROR(VLOOKUP(B2,'表單回應 2'!B:E,4,false),-99)
 ```
 
 
