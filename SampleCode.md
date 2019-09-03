@@ -314,8 +314,26 @@ else
 =IFERROR(VLOOKUP(B2,'表單回應 2'!B:E,4,false),-99)
 ```
 
+## 補充資料：Facebook 主動推播
+```
+private async void PushFacebookMessage(string messageText)
+{
+	Microsoft.Bot.Connector.Authentication.MicrosoftAppCredentials.TrustServiceUrl("https://facebook.botframework.com/");
 
+	var botAccount = new ChannelAccount(name: "FacebookBotName", id: "FacebookBotId");
+	var userAccount = new ChannelAccount(name: "UserName", id: "UserId");
+	var connector = new ConnectorClient(new Uri("https://facebook.botframework.com/"), _config["MicrosoftAppId"], _config["MicrosoftAppPassword"]);
+	var conversationId = await connector.Conversations.CreateDirectConversationAsync(botAccount, userAccount);
 
+	IMessageActivity message = Activity.CreateMessageActivity();
+	message.From = botAccount;
+	message.Recipient = userAccount;
+	message.Conversation = new ConversationAccount(id: conversationId.Id);
+	message.Text = messageText;
+	message.Locale = "en-Us";
+	await connector.Conversations.SendToConversationAsync((Activity)message);
+}
+```
 
 
 
