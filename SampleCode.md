@@ -334,11 +334,85 @@ private async void PushFacebookMessage(string messageText)
 	await connector.Conversations.SendToConversationAsync((Activity)message);
 }
 ```
+## 補充資料：使用 SQL 資料庫儲存對話紀錄
+#### 在 SQL 資料庫中建立新資料表 ChatRecords
+```
+CREATE TABLE ChatRecords (
+    Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    Channel varchar(50) NOT NULL,
+    UserId varchar(255) NOT NULL,
+    UserName nvarchar(255),
+    UserRequest nvarchar(2000) NOT NULL,
+    BotResponse nvarchar(2000) NOT NULL,
+    RequestJson nvarchar(4000) NOT NULL,
+    Created datetime,
+    SurveyAns nvarchar(100),
+    Surveyed datetime,
+);
+```
+#### 修改 CollectRequestData
+```
+private void CollectRequestData(ITurnContext<IMessageActivity> turnContext, string answer)
+{
+	// Convert UTC Time to Taipei Time
+	DateTime timeUtc = DateTime.UtcNow;
+	TimeZoneInfo taipeiZone = TimeZoneInfo.FindSystemTimeZoneById("Taipei Standard Time");
+	DateTime taipeiTime = TimeZoneInfo.ConvertTimeFromUtc(timeUtc, taipeiZone);
+	var json = JsonConvert.SerializeObject(turnContext.Activity);
 
+	string cmdText = "INSERT INTO [ChatRecords] ([Channel],[UserId],[UserName],";
+	cmdText += "[UserRequest],[BotResponse],[RequestJson],[Created],[SurveyAns],[Surveyed]) ";
+	cmdText += "VALUES (@Channel,@UserId,@UserName,@UserRequest,@BotResponse,@RequestJson,@Created,'',@Created);";
 
+	using (SqlCommand cmd = new SqlCommand())
+	{
+		cmd.CommandText = cmdText;
+		cmd.CommandType = CommandType.Text;
+		cmd.Parameters.Add("@Channel", SqlDbType.VarChar).Value = turnContext.Activity.ChannelId;
+		cmd.Parameters.Add("@UserId", SqlDbType.VarChar).Value = turnContext.Activity.From.Id;
+		cmd.Parameters.Add("@UserName", SqlDbType.NVarChar).Value = turnContext.Activity.From.Name;
+		cmd.Parameters.Add("@UserRequest", SqlDbType.NVarChar).Value = turnContext.Activity.Text;
+		cmd.Parameters.Add("@BotResponse", SqlDbType.NVarChar).Value = answer;
+		cmd.Parameters.Add("@RequestJson", SqlDbType.NVarChar).Value = json;
+		cmd.Parameters.Add("@Created", SqlDbType.DateTime).Value = taipeiTime;
+		using (SqlConnection con = new SqlConnection(_config["SqlConnStr"]))
+		{
+			cmd.Connection = con;
+			con.Open();
+			cmd.ExecuteNonQuery();
+		}
+	}
+}
+```
+#### 修改 CollectSurveyData
+```
+private void CollectSurveyData(ITurnContext<IMessageActivity> turnContext, string result)
+{
+	DateTime timeUtc = DateTime.UtcNow;
+	TimeZoneInfo taipeiZone = TimeZoneInfo.FindSystemTimeZoneById("Taipei Standard Time");
+	DateTime taipeiTime = TimeZoneInfo.ConvertTimeFromUtc(timeUtc, taipeiZone);
 
+	string cmdText = "WITH temp AS (SELECT MAX(Id)maxid FROM ChatRecords WHERE Channel=@Channel AND UserId=@UserId)";
+	cmdText += "UPDATE ChatRecords SET SurveyAns=@SurveyAns, Surveyed=@Surveyed ";
+	cmdText += "FROM ChatRecords INNER JOIN temp ON Id = maxid WHERE SurveyAns='';";
 
-
+	using (SqlCommand cmd = new SqlCommand())
+	{
+		cmd.CommandText = cmdText;
+		cmd.CommandType = CommandType.Text;
+		cmd.Parameters.Add("@Channel", SqlDbType.VarChar).Value = turnContext.Activity.ChannelId;
+		cmd.Parameters.Add("@UserId", SqlDbType.VarChar).Value = turnContext.Activity.From.Id;
+		cmd.Parameters.Add("@SurveyAns", SqlDbType.NVarChar).Value = gradeDictionary.ContainsKey(result) ? gradeDictionary[result] : result;
+		cmd.Parameters.Add("@Surveyed", SqlDbType.DateTime).Value = taipeiTime;
+		using (SqlConnection con = new SqlConnection(_config["SqlConnStr"]))
+		{
+			cmd.Connection = con;
+			con.Open();
+			cmd.ExecuteNonQuery();
+		}
+	}
+}
+```
 
 
 
